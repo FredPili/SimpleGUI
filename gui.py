@@ -169,11 +169,26 @@ class WaveViewer :
         self.canvas.create_image(0, 0, image=display, anchor="nw")
         self.canvas.image = display
 
-        self.choices = ["gray", "viridis", "magma", "inferno", "managua", "ocean", "plasma", "jet", "coolwarm"]
+        fourier_frame = ttk.Frame(visu_frame)
+        fourier_frame.grid(column=1, row=0, sticky="news")
+        self.fourier_checkval = IntVar()
+        fourier_checkbox = ttk.Checkbutton(fourier_frame, text="Fourier Transform", variable=self.fourier_checkval, onvalue=1, offvalue=0, command=self.oncheck)
+        fourier_checkbox.grid(column=0, columnspan=2, row=0, sticky="new")
+        self.ftype_var = StringVar(value="mag")
+        ftype_mag_button = ttk.Radiobutton(fourier_frame, text="Magnitude", variable=self.ftype_var, value="mag", command=self.onradio)
+        ftype_mag_button.grid(column=0, row=1, sticky="new")
+        ftype_phase_button = ttk.Radiobutton(fourier_frame, text="Phase", variable=self.ftype_var, value="phase", command=self.onradio)
+        ftype_phase_button.grid(column=1, row=1, sticky="new")
+
+        for child in fourier_frame.winfo_children() :
+            child.grid_configure(padx=2, pady=5)
+
+
+        self.choices = ["gray", "viridis", "magma", "inferno", "managua", "ocean", "plasma", "jet", "coolwarm", "hsv"]
         self.cmap = plt.get_cmap("gray")
         choicesvar = StringVar(value=self.choices)
         self.listbox = Listbox(visu_frame, height=min(len(self.choices), 15), selectmode="browse", listvariable=choicesvar)
-        self.listbox.grid(column=1, row=0, sticky="n")
+        self.listbox.grid(column=2, row=0, sticky="n")
         self.listbox.bind("<<ListboxSelect>>", self.onselect)
 
         generate_button = ttk.Button(visu_frame, text="Generate Image", command=self.generate)
@@ -196,7 +211,7 @@ class WaveViewer :
         angle = self.angle_bundle.get()
         angle = deg2rad(angle)
         phase = self.phase_bundle.get()
-        phase = deg2rad(phase)
+        phase = deg2rad(phase) + 0.001
         nb_samples = self.sample_bundle.get()
         time = self.time_bundle.get()
         length = self.length_bundle.get()
@@ -212,7 +227,19 @@ class WaveViewer :
         X, Y = np.meshgrid(x, x)
         image = np.sin(2 * np.pi * freq * (np.cos(angle) * X + np.sin(angle) * Y - time) + phase)
 
+        # Fourier transform
+        if self.fourier_checkval.get() :
+            transform = np.fft.fft2(image)
+            shifted_transorm = np.fft.fftshift(transform)
+            if self.ftype_var.get() == "mag" :
+                image = np.abs(shifted_transorm)
+            elif self.ftype_var.get() == "phase" :
+                image = np.angle(shifted_transorm)
+                image = (image + np.pi) / (2 * np.pi)
+
+                
         # Display 
+        image = (image - np.min(image)) / (np.max(image) - np.min(image))
         colored_image = cmap(image)
         PIL_image = Image.fromarray((colored_image[:,:,:3]*255).astype(np.uint8)).resize((self.width, self.height), resample=Image.Resampling.NEAREST)
         display = ImageTk.PhotoImage(PIL_image)
@@ -223,6 +250,12 @@ class WaveViewer :
     # Listbox onevent callback
     def onselect(self, evt) :
         self.generate()        
+
+    def oncheck(self) :
+        self.generate()
+
+    def onradio(self) :
+        self.generate()
 
 
 if __name__=="__main__" :
