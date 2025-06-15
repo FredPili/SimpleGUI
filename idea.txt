@@ -1,0 +1,13 @@
+GUI that displays a 2D sinwave, possiblity to choose : 
+    the angle, 
+    the frequency, 
+    the number of sample points (image resolution),
+    The colormap
+
+The image must stay the same size in the GUI no matter the number of sample points
+
+
+Future ideas : 
+    - Add the possiblity to display 1D sinwaves
+    - Add a fourier transform visualization 
+    - Possibility to add mutliple frequencies
