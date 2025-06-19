@@ -6,7 +6,18 @@ import matplotlib.pyplot as plt
 
 
 class EntryBundle(ttk.Frame) :
-    def __init__(self, root, name, width=10, type=None, default_value=None, uniform=None, add_scale=False, from_=None, to=None, callback=None) :
+    def __init__(
+            self, 
+            root, 
+            name, 
+            width=10, 
+            type=None, 
+            default_value=None, 
+            uniform=None, 
+            add_scale=False, 
+            from_=None, 
+            to=None, 
+            callback=None) :
         super().__init__(root)
 
         self.grid_columnconfigure(0, weight=1, uniform=uniform)
@@ -53,6 +64,161 @@ class EntryBundle(ttk.Frame) :
     def get(self) : 
         return self.value.get()
 
+class FrequencyFrame(ttk.Frame) :
+    def __init__(
+            self,
+            root,
+            name,
+            callback
+    ) :
+        super().__init__(root)
+
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+
+        frame = ttk.Frame(self, border=1, relief="solid", padding=(5, 5, 5, 5))
+        frame.grid(column=0, row=0, sticky="news")
+
+        # Create a label (frequency name)
+        freq_label = ttk.Label(frame, text=name)
+        freq_label.grid(column=0, row=0, sticky="nw")
+
+        # Create entries
+        # Uniform to align the entries
+        uniform = "FreqGroup"
+
+        self.frequency_bundle = EntryBundle(
+            root=frame,
+            name="Frequency",
+            default_value=1.0,
+            add_scale=True,
+            from_=0.1,
+            to=100.0,
+            uniform=uniform,
+            callback=callback,
+        )
+        self.frequency_bundle.grid(column=0, row=1, sticky="news")
+
+        self.amplitude_bundle = EntryBundle(
+            root=frame,
+            name="Amplitude",
+            default_value=1.0,
+            add_scale=True,
+            from_=0.1,
+            to=10,
+            uniform=uniform,
+            callback=callback,
+        )
+        self.amplitude_bundle.grid(column=1, row=1, sticky="news")
+
+        self.phase_bundle = EntryBundle(
+            root=frame,
+            name="Phase",
+            default_value=0.0,
+            add_scale=True,
+            from_=0.0,
+            to=360,
+            uniform=uniform,
+            callback=callback,
+        )
+        self.phase_bundle.grid(column=0, row=2, sticky="news")
+
+        self.angle_bundle = EntryBundle(
+            root=frame,
+            name="Angle",
+            default_value=0.0,
+            add_scale=True,
+            from_=0.0,
+            to=360.0,
+            uniform=uniform,
+            callback=callback,
+        )
+        self.angle_bundle.grid(column=1, row=2, sticky="news")
+
+    def get(self, param) :
+        param_mapping = {
+            "frequency" : self.frequency_bundle,
+            "amplitude" : self.amplitude_bundle,
+            "phase" : self.phase_bundle,
+            "angle" : self.angle_bundle,
+        }
+        return param_mapping[param].get()
+
+
+class FrequencyEditor(ttk.Frame) :
+    def __init__(
+            self,
+            root,
+            callback,
+    ) :
+        # Should be able to create multiple grequencies with each its own set of parameters
+        super().__init__(root)
+        self.callback = callback
+
+        # TODO Add grid column and row configure
+        # Starts with one frequency
+        # Create a frame that will contain the parameters
+        self.frame = ttk.Frame(self)
+        self.frame.grid(column=0, row=0, sticky="new")
+        self.frequencies = {}
+
+        # Button to add a frequency, always as the last row
+        self.add_button = ttk.Button(self.frame, text="Add", command=self.add_frequency)
+        _, nb_row = self.frame.grid_size()
+        self.add_button.grid(column=0, row=nb_row, sticky="news")
+
+        # Initialize the first frequency
+        self.add_frequency()
+
+        # Add y padding to every children of the editor frame
+        for child in self.frame.winfo_children() :
+            child.grid_configure(pady=8)
+        
+        # Configure row and colums priorities
+        nb_col, nb_row = self.frame.grid_size()
+        for col in range(nb_col) :
+            self.frame.grid_columnconfigure(col, weight=1)
+        for row in range(nb_row) :
+            self.frame.grid_rowconfigure(row, weight=1)
+
+
+    def add_frequency(self) :
+        freq_labels = list(self.frequencies.keys())
+        if len(freq_labels) == 0 :
+            new_freq_label = "1"
+        else :
+            labels = sorted([int(label) for label in freq_labels])
+            last_label = max(labels)
+            new_freq_label = str(last_label+1)
+
+        freq_frame = FrequencyFrame(root=self.frame, name="Frequency " + new_freq_label, callback=self.callback)
+        freq_frame.grid(column=0, row=int(new_freq_label), sticky="news")
+        self.frequencies[new_freq_label] = freq_frame
+
+        # Move the add button position
+        _, nb_row = self.frame.grid_size()
+        self.add_button.grid(column=0, row=nb_row, sticky="news")
+
+        # Configure row and colums priorities
+        nb_col, nb_row = self.frame.grid_size()
+        for col in range(nb_col) :
+            self.frame.grid_columnconfigure(col, weight=1)
+        for row in range(nb_row) :
+            self.frame.grid_rowconfigure(row, weight=1)
+
+
+    def get_frequencies_param(self) :
+        freq_params = {}
+        for name, freqframe in self.frequencies.items() :
+            freq_params[name] = {}
+            for param in ["frequency", "amplitude", "phase", "angle"] :
+                freq_params[name][param] = freqframe.get(param)
+        return freq_params
+
+
+
 class WaveViewer :
     def __init__(self, root) :
         root.title("Wave Viewer")
@@ -62,36 +228,12 @@ class WaveViewer :
         root.columnconfigure(0, weight=1)
         root.rowconfigure(0, weight=1)
 
-
+        # ----------TOP Frame----------------------------
+        top_frame = ttk.Frame(mainframe)
+        top_frame.grid(column=0, row=0, sticky="news")
         #-----------Param Frame--------------------------
-        param_frame = ttk.Frame(mainframe)
+        param_frame = ttk.Frame(top_frame)
         param_frame.grid(column=0, row=0, sticky=(E, W))
-        
-        self.freq_bundle = EntryBundle(
-            param_frame, 
-            name="Frequency (Hz)", 
-            default_value=1, 
-            type="double", 
-            add_scale=True, 
-            from_=0.1,
-            to=100,
-            callback=self.generate,
-            uniform="params", 
-            )
-        self.freq_bundle.grid(column=0, row=0, sticky="nsew")
-
-        self.angle_bundle = EntryBundle(
-            param_frame, 
-            name="Angle (°)", 
-            default_value=0, 
-            type="double",
-            add_scale=True, 
-            from_=0,
-            to=360,
-            callback=self.generate,
-            uniform="params"
-            )
-        self.angle_bundle.grid(column=0, row=1, sticky="nsew")
 
         self.sample_bundle = EntryBundle(
             param_frame, 
@@ -104,33 +246,8 @@ class WaveViewer :
             callback=self.generate,
             uniform="params"
             )
-        self.sample_bundle.grid(column=2, row=0, sticky="nsew")
+        self.sample_bundle.grid(column=0, row=0, sticky="nsew")
 
-        self.time_bundle = EntryBundle(
-            param_frame, 
-            name="Time (s)", 
-            default_value=0, 
-            type="double",
-            add_scale=True, 
-            from_=0,
-            to=1,
-            callback=self.generate,
-            uniform="params"
-            )
-        self.time_bundle.grid(column=1, row=1, sticky="nsew")
-
-        self.phase_bundle = EntryBundle(
-            param_frame, 
-            name="Phase (°)", 
-            default_value=0, 
-            type="double",
-            add_scale=True,
-            from_=0,
-            to=360,
-            callback=self.generate, 
-            uniform="params"
-            )
-        self.phase_bundle.grid(column=1, row=0, sticky="nsew")
 
         self.length_bundle = EntryBundle(
             param_frame, 
@@ -143,7 +260,7 @@ class WaveViewer :
             callback=self.generate, 
             uniform="params"
             )
-        self.length_bundle.grid(column=2, row=1, sticky="nsew")
+        self.length_bundle.grid(column=1, row=0, sticky="nsew")
 
         col_count, row_count = param_frame.grid_size()
         for col in range(col_count) :
@@ -154,10 +271,18 @@ class WaveViewer :
 
         for child in param_frame.winfo_children() :
             child.grid_configure(padx=2, pady=2)
+        
+        #-----------------Bottom Frame-----------------------
+        bottom_frame = ttk.Frame(mainframe)
+        bottom_frame.grid(column=0, row=1, sticky="news")
+
+        #----------------Frequency Editor---------------------
+        self.freq_editor = FrequencyEditor(bottom_frame, callback=self.generate)
+        self.freq_editor.grid(column=0, row=0, sticky="nesw")
 
         #--------------Visualiazation Frame--------------------
-        visu_frame = ttk.Frame(mainframe)
-        visu_frame.grid(column=0, row=1, sticky=(E, W))
+        visu_frame = ttk.Frame(bottom_frame)
+        visu_frame.grid(column=1, row=0, sticky=(E, W))
 
         # PLaceholder image to confirm the widhets positions
         self.width, self.height = 500, 500
@@ -205,16 +330,14 @@ class WaveViewer :
     def generate(self, *args) :
         # Hepler functions 
         deg2rad = lambda deg : np.pi * deg / 180.0
-        
-        # Get parameters
-        freq = self.freq_bundle.get()
-        angle = self.angle_bundle.get()
-        angle = deg2rad(angle)
-        phase = self.phase_bundle.get()
-        phase = deg2rad(phase) + 0.001
+
+        # Get general parameters 
         nb_samples = self.sample_bundle.get()
-        time = self.time_bundle.get()
         length = self.length_bundle.get()
+
+        
+        # Get frequencies parameters
+        freq_params = self.freq_editor.get_frequencies_param()
 
         if len(self.listbox.curselection()) == 0 :
             cmap = self.cmap
@@ -225,7 +348,15 @@ class WaveViewer :
         # Generate wave
         x = np.linspace(0, length, nb_samples)
         X, Y = np.meshgrid(x, x)
-        image = np.sin(2 * np.pi * freq * (np.cos(angle) * X + np.sin(angle) * Y - time) + phase)
+        image = np.zeros_like(X)
+        for params in freq_params.values() :
+            freq = params["frequency"]
+            angle = params["angle"]
+            amplitude = params["amplitude"]
+            phase = params["phase"]
+            angle = deg2rad(angle)
+            phase = deg2rad(phase) + 0.001
+            image += amplitude * np.sin(2 * np.pi * freq * (np.cos(angle) * X + np.sin(angle) * Y) + phase)
 
         # Fourier transform
         if self.fourier_checkval.get() :
