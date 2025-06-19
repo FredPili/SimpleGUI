@@ -3,6 +3,26 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 import numpy as np
 import matplotlib.pyplot as plt
+from enum import IntEnum
+
+class Events(IntEnum) :
+    PARAM_CHANGE = 1
+    DISPLAY_CHANGE = 2
+
+
+class EventBus :
+    # Simple event bus class, no payload in the publish, only for triggering callbacks
+    def __init__(self) :
+        self.subscribers = {}
+
+    def subscribe(self, event, handler) :
+        if event not in self.subscribers :
+            self.subscribers[event] = []
+        self.subscribers[event].append(handler)
+
+    def publish(self, event) :
+        for handler in self.subscribers.get(event, []) :
+            handler()
 
 
 class EntryBundle(ttk.Frame) :
@@ -17,7 +37,8 @@ class EntryBundle(ttk.Frame) :
             add_scale=False, 
             from_=None, 
             to=None, 
-            callback=None) :
+            callback=None
+            ) :
         super().__init__(root)
 
         self.grid_columnconfigure(0, weight=1, uniform=uniform)
@@ -120,7 +141,47 @@ class FrequencyFrame(ttk.Frame) :
             "angle" : self.angle_bundle,
         }
         return param_mapping[param].get()
-    
+
+
+class ScrolledCanvas(Frame):
+
+    def __init__(self, parent, vertical=True, horizontal=False):
+        super().__init__(parent)
+        
+        # create canvas
+        self._canvas = Canvas(self)
+        self._canvas.grid(row=0, column=0, sticky='nwes') # changed   
+
+        # create right scrollbar and connect to canvas Y
+        self._vertical_bar = Scrollbar(parent, orient='vertical', command=self._canvas.yview)
+        if vertical:
+            self._vertical_bar.grid(row=0, column=1, sticky='ns')
+        self._canvas.configure(yscrollcommand=self._vertical_bar.set)
+
+        # create bottom scrollbar and connect to canvas X
+        self._horizontal_bar = Scrollbar(self, orient='horizontal', command=self._canvas.xview)
+        if horizontal:
+            self._horizontal_bar.grid(row=1, column=0, sticky='we')
+        self._canvas.configure(xscrollcommand=self._horizontal_bar.set)
+
+        self.inner = None
+        
+        # autoresize inner frame
+        self.columnconfigure(0, weight=1) # changed
+        self.rowconfigure(0, weight=1) # changed
+        
+
+    def resize(self, event=None): 
+        self._canvas.configure(scrollregion=self._canvas.bbox('all'))
+        self._canvas.itemconfig(self._window, width=self._canvas.winfo_width())
+
+
+    def add(self, widget):
+        self.inner = widget
+        self._window = self._canvas.create_window((0, 0), window=self.inner, anchor='nw')
+        self.inner.bind('<Configure>', self.resize)
+        self._canvas.bind('<Configure>', self.resize)
+
 
 class FrequencyEditor(ttk.Frame) :
     def __init__(
@@ -130,9 +191,15 @@ class FrequencyEditor(ttk.Frame) :
     ) :
         super().__init__(root)
         self.callback = callback
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
 
-        self.frame = ttk.Frame(self)
-        self.frame.grid(column=0, row=0, sticky="new")
+
+        scrolled_canvas = ScrolledCanvas(self, vertical=True, horizontal=False)
+
+        self.frame = ttk.Frame(scrolled_canvas)
+        scrolled_canvas.add(self.frame)
+        scrolled_canvas.grid(column=0, row=0, sticky="news")
 
         # Initialize widgets and button
         self.frequencies_widgets = {}
@@ -148,7 +215,7 @@ class FrequencyEditor(ttk.Frame) :
         for child in self.frame.winfo_children() :
             child.grid_configure(pady=8)
         
-        # Configure row and colums priorities
+        # Configure row and colums priorities in the frame
         nb_col, nb_row = self.frame.grid_size()
         for col in range(nb_col) :
             self.frame.grid_columnconfigure(col, weight=1)
@@ -210,11 +277,14 @@ class FrequencyEditor(ttk.Frame) :
         return freq_params
 
 
-
 class WaveViewer :
     def __init__(self, root) :
-        root.title("Wave Viewer")
+        # Setup the event bus
+        self.event_bus = EventBus()
+        self.event_bus.subscribe(Events.PARAM_CHANGE, self.on_param_change)
+        self.event_bus.subscribe(Events.DISPLAY_CHANGE, self.on_display_change)
 
+        root.title("Wave Viewer")
         mainframe = ttk.Frame(root)
         mainframe.grid(column=0, row=0, sticky=(N, W, E, S))
         root.columnconfigure(0, weight=1)
@@ -235,7 +305,7 @@ class WaveViewer :
             add_scale=True, 
             from_=2,
             to=500,
-            callback=self.generate,
+            callback=lambda: self.event_bus.publish(Events.PARAM_CHANGE),
             uniform="params"
             )
         self.sample_bundle.grid(column=0, row=0, sticky="nsew")
@@ -249,7 +319,7 @@ class WaveViewer :
             add_scale=True,
             from_=1,
             to=10,
-            callback=self.generate, 
+            callback=lambda: self.event_bus.publish(Events.PARAM_CHANGE), 
             uniform="params"
             )
         self.length_bundle.grid(column=1, row=0, sticky="nsew")
@@ -269,17 +339,17 @@ class WaveViewer :
         bottom_frame.grid(column=0, row=1, sticky="news")
 
         #----------------Frequency Editor---------------------
-        self.freq_editor = FrequencyEditor(bottom_frame, callback=self.generate)
+        self.freq_editor = FrequencyEditor(bottom_frame, callback=lambda: self.event_bus.publish(Events.PARAM_CHANGE))
         self.freq_editor.grid(column=0, row=0, sticky="nesw")
 
         #--------------Visualiazation Frame--------------------
         visu_frame = ttk.Frame(bottom_frame)
         visu_frame.grid(column=1, row=0, sticky=(E, W))
 
-        # PLaceholder image to confirm the widhets positions
+        # PLaceholder self.image to confirm the widhets positions
         self.width, self.height = 500, 500
-        image = Image.open("placeholder.jpeg").resize((self.width, self.height))
-        display = ImageTk.PhotoImage(image)
+        self.image = Image.open("placeholder.jpeg").resize((self.width, self.height))
+        display = ImageTk.PhotoImage(self.image)
         display = display
         self.canvas = Canvas(visu_frame, width=self.width, height=self.height)
         self.canvas.grid(column=0, row=0, rowspan=2, sticky=(N, W, E, S))
@@ -289,12 +359,12 @@ class WaveViewer :
         fourier_frame = ttk.Frame(visu_frame)
         fourier_frame.grid(column=1, row=0, sticky="news")
         self.fourier_checkval = IntVar()
-        fourier_checkbox = ttk.Checkbutton(fourier_frame, text="Fourier Transform", variable=self.fourier_checkval, onvalue=1, offvalue=0, command=self.oncheck)
+        fourier_checkbox = ttk.Checkbutton(fourier_frame, text="Fourier Transform", variable=self.fourier_checkval, onvalue=1, offvalue=0, command=lambda: self.event_bus.publish(Events.PARAM_CHANGE))
         fourier_checkbox.grid(column=0, columnspan=2, row=0, sticky="new")
         self.ftype_var = StringVar(value="mag")
-        ftype_mag_button = ttk.Radiobutton(fourier_frame, text="Magnitude", variable=self.ftype_var, value="mag", command=self.onradio)
+        ftype_mag_button = ttk.Radiobutton(fourier_frame, text="Magnitude", variable=self.ftype_var, value="mag", command=lambda: self.event_bus.publish(Events.PARAM_CHANGE))
         ftype_mag_button.grid(column=0, row=1, sticky="new")
-        ftype_phase_button = ttk.Radiobutton(fourier_frame, text="Phase", variable=self.ftype_var, value="phase", command=self.onradio)
+        ftype_phase_button = ttk.Radiobutton(fourier_frame, text="Phase", variable=self.ftype_var, value="phase", command=lambda: self.event_bus.publish(Events.PARAM_CHANGE))
         ftype_phase_button.grid(column=1, row=1, sticky="new")
 
         for child in fourier_frame.winfo_children() :
@@ -306,9 +376,10 @@ class WaveViewer :
         choicesvar = StringVar(value=self.choices)
         self.listbox = Listbox(visu_frame, height=min(len(self.choices), 15), selectmode="browse", listvariable=choicesvar)
         self.listbox.grid(column=2, row=0, sticky="n")
-        self.listbox.bind("<<ListboxSelect>>", self.onselect)
+        from functools import partial
+        self.listbox.bind("<<ListboxSelect>>", lambda event: self.event_bus.publish(Events.DISPLAY_CHANGE))
 
-        generate_button = ttk.Button(visu_frame, text="Generate Image", command=self.generate)
+        generate_button = ttk.Button(visu_frame, text="Generate Image", command=self.update)
         generate_button.grid(column=1, row=1, sticky="se")
 
         for child in visu_frame.winfo_children():
@@ -317,30 +388,24 @@ class WaveViewer :
         for child in mainframe.winfo_children():
             child.grid_configure(padx=5, pady=5)
 
-        self.generate()
+        self.update()
 
-    def generate(self, *args) :
+    def update(self) :
+        self.generate_image()
+        self.display_image()
+
+    def generate_image(self, *args) :
         # Hepler functions 
         deg2rad = lambda deg : np.pi * deg / 180.0
-
         # Get general parameters 
         nb_samples = self.sample_bundle.get()
         length = self.length_bundle.get()
-
-        
         # Get frequencies parameters
         freq_params = self.freq_editor.get_frequencies_param()
-
-        if len(self.listbox.curselection()) == 0 :
-            cmap = self.cmap
-        else :
-            cmap = plt.get_cmap(self.choices[self.listbox.curselection()[0]])
-            self.cmap = cmap
-
         # Generate wave
         x = np.linspace(0, length, nb_samples)
         X, Y = np.meshgrid(x, x)
-        image = np.zeros_like(X)
+        self.image = np.zeros_like(X)
         for params in freq_params.values() :
             freq = params["frequency"]
             angle = params["angle"]
@@ -348,41 +413,46 @@ class WaveViewer :
             phase = params["phase"]
             angle = deg2rad(angle)
             phase = deg2rad(phase) + 0.001
-            image += amplitude * np.sin(2 * np.pi * freq * (np.cos(angle) * X + np.sin(angle) * Y) + phase)
-
+            self.image += amplitude * np.sin(2 * np.pi * freq * (np.cos(angle) * X + np.sin(angle) * Y) + phase)
         # Fourier transform
         if self.fourier_checkval.get() :
-            transform = np.fft.fft2(image)
+            transform = np.fft.fft2(self.image)
             shifted_transorm = np.fft.fftshift(transform)
             if self.ftype_var.get() == "mag" :
-                image = np.abs(shifted_transorm)
+                self.image = np.abs(shifted_transorm)
             elif self.ftype_var.get() == "phase" :
-                image = np.angle(shifted_transorm)
-                image = (image + np.pi) / (2 * np.pi)
+                self.image = np.angle(shifted_transorm)
+                self.image = (self.image + np.pi) / (2 * np.pi)
 
-                
-        # Display 
-        image = (image - np.min(image)) / (np.max(image) - np.min(image))
-        colored_image = cmap(image)
+
+    def display_image(self) :
+        # Select cmap 
+        if len(self.listbox.curselection()) == 0 :
+            cmap = self.cmap
+        else :
+            cmap = plt.get_cmap(self.choices[self.listbox.curselection()[0]])
+            self.cmap = cmap
+        # Normalize image
+        self.image = (self.image - np.min(self.image)) / (np.max(self.image) - np.min(self.image))
+        # Apply cmap
+        colored_image = cmap(self.image)
+        # Convert image for Tkinter
         PIL_image = Image.fromarray((colored_image[:,:,:3]*255).astype(np.uint8)).resize((self.width, self.height), resample=Image.Resampling.NEAREST)
         display = ImageTk.PhotoImage(PIL_image)
+        # Update display
         self.canvas.delete("all")
         self.canvas.create_image(0, 0, image=display, anchor="nw")
         self.canvas.image = display
 
-    # Listbox onevent callback
-    def onselect(self, evt) :
-        self.generate()        
+    def on_param_change(self) :
+        self.generate_image()
+        self.display_image()
 
-    def oncheck(self) :
-        self.generate()
-
-    def onradio(self) :
-        self.generate()
-
+    def on_display_change(self) :
+        self.display_image()
 
 if __name__=="__main__" :
     root = Tk()
     wv = WaveViewer(root)
-    root.bind("<Return>", wv.generate)
+    root.bind("<Return>", lambda event: wv.update())
     root.mainloop()
