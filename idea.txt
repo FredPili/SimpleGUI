@@ -1,4 +1,4 @@
-GUI that displays a 2D sinwave, possiblity to choose : 
+GUI that displays a 2D sinwave, possiblity to choose : DONE
     the angle, 
     the frequency, 
     the number of sample points (image resolution),
@@ -8,6 +8,9 @@ The image must stay the same size in the GUI no matter the number of sample poin
 
 
 Future ideas : 
-    - Add the possiblity to display 1D sinwaves
-    - Add a fourier transform visualization 
-    - Possibility to add mutliple frequencies
+    - Add the possiblity to display 1D sinwaves 
+    - Add a fourier transform visualization DONE
+    - Possibility to add mutliple frequencies DONE
+    - Seperate logic from UI
+    - Implement an evet bus to avoid having to recompute the 
+    image for each callacks if not needed.
