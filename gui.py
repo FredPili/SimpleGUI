@@ -89,53 +89,28 @@ class FrequencyFrame(ttk.Frame) :
         # Uniform to align the entries
         uniform = "FreqGroup"
 
-        self.frequency_bundle = EntryBundle(
-            root=frame,
-            name="Frequency",
-            default_value=1.0,
-            add_scale=True,
-            from_=0.1,
-            to=100.0,
-            uniform=uniform,
-            callback=callback,
-        )
-        self.frequency_bundle.grid(column=0, row=1, sticky="news")
-
-        self.amplitude_bundle = EntryBundle(
-            root=frame,
-            name="Amplitude",
-            default_value=1.0,
-            add_scale=True,
-            from_=0.1,
-            to=10,
-            uniform=uniform,
-            callback=callback,
-        )
-        self.amplitude_bundle.grid(column=1, row=1, sticky="news")
-
-        self.phase_bundle = EntryBundle(
-            root=frame,
-            name="Phase",
-            default_value=0.0,
-            add_scale=True,
-            from_=0.0,
-            to=360,
-            uniform=uniform,
-            callback=callback,
-        )
-        self.phase_bundle.grid(column=0, row=2, sticky="news")
-
-        self.angle_bundle = EntryBundle(
-            root=frame,
-            name="Angle",
-            default_value=0.0,
-            add_scale=True,
-            from_=0.0,
-            to=360.0,
-            uniform=uniform,
-            callback=callback,
-        )
-        self.angle_bundle.grid(column=1, row=2, sticky="news")
+        params = {
+            "frequency": ("Frequency (Hz)", 1.0, 0.1, 100.0),
+            "amplitude": ("Amplitude", 1.0, 0.1, 10),
+            "phase": ("Phase", 0.0, 0.0, 360.0),
+            "angle": ("Angle", 0.0, 0.0, 360.0),
+        }
+        positions = [(0,1), (1,1), (0,2), (1,2)]
+        
+        # Build the widgets
+        for (bundle_name, (name, default_value, from_, to)), (column, row) in zip(params.items(), positions) :
+            bundle = EntryBundle(
+                root=frame,
+                name=name,
+                default_value=default_value,
+                add_scale=True,
+                from_=from_,
+                to=to,
+                uniform=uniform,
+                callback=callback,
+            )
+            bundle.grid(column=column, row=row, sticky="news")
+            setattr(self, f"{bundle_name}_bundle", bundle)
 
     def get(self, param) :
         param_mapping = {
@@ -145,7 +120,7 @@ class FrequencyFrame(ttk.Frame) :
             "angle" : self.angle_bundle,
         }
         return param_mapping[param].get()
-
+    
 
 class FrequencyEditor(ttk.Frame) :
     def __init__(
@@ -153,24 +128,21 @@ class FrequencyEditor(ttk.Frame) :
             root,
             callback,
     ) :
-        # Should be able to create multiple grequencies with each its own set of parameters
         super().__init__(root)
         self.callback = callback
 
-        # TODO Add grid column and row configure
-        # Starts with one frequency
-        # Create a frame that will contain the parameters
         self.frame = ttk.Frame(self)
         self.frame.grid(column=0, row=0, sticky="new")
-        self.frequencies = {}
 
-        # Button to add a frequency, always as the last row
-        self.add_button = ttk.Button(self.frame, text="Add", command=self.add_frequency)
-        _, nb_row = self.frame.grid_size()
-        self.add_button.grid(column=0, row=nb_row, sticky="news")
+        # Initialize widgets and button
+        self.frequencies_widgets = {}
+        self.add_button = None
 
         # Initialize the first frequency
-        self.add_frequency()
+        self.frequencies = [1]
+        
+        # Build the editor
+        self.build()
 
         # Add y padding to every children of the editor frame
         for child in self.frame.winfo_children() :
@@ -183,38 +155,58 @@ class FrequencyEditor(ttk.Frame) :
         for row in range(nb_row) :
             self.frame.grid_rowconfigure(row, weight=1)
 
-
     def add_frequency(self) :
-        freq_labels = list(self.frequencies.keys())
-        if len(freq_labels) == 0 :
-            new_freq_label = "1"
-        else :
-            labels = sorted([int(label) for label in freq_labels])
-            last_label = max(labels)
-            new_freq_label = str(last_label+1)
+        new_freq = max(self.frequencies) + 1
+        self.frequencies.append(new_freq)
+        self.build()
 
-        freq_frame = FrequencyFrame(root=self.frame, name="Frequency " + new_freq_label, callback=self.callback)
-        freq_frame.grid(column=0, row=int(new_freq_label), sticky="news")
-        self.frequencies[new_freq_label] = freq_frame
+    def delete_frequency(self, freq) :
+        self.frequencies.remove(freq)
+        self.build()
 
-        # Move the add button position
+    def build(self) :
+        # Clear the frame
+        displayed_frequencies = self.frequencies_widgets.keys()
+        to_remove = set(displayed_frequencies) - set(self.frequencies)
+        if len(to_remove) > 0:
+            for freq in to_remove :
+                self.frequencies_widgets[freq]["entry_frame"].destroy()
+        # Remove element from dict
+        for freq in to_remove :
+            del self.frequencies_widgets[freq]
+
+        # Build every Frequency entries
+        to_add = set(self.frequencies) - set(displayed_frequencies)
+        if len(to_add) > 0:
+            for freq in to_add :
+                entry_frame = ttk.Frame(self.frame)
+                freq_frame = FrequencyFrame(root=entry_frame, name="Frequency " + str(freq), callback=self.callback)
+                freq_frame.grid(column=0, row=0, sticky="news")
+                del_button = ttk.Button(
+                    entry_frame, 
+                    text="Delete", 
+                    command=lambda i=freq: self.delete_frequency(i)) # Pass parameter to identify the button pressed
+                del_button.grid(column=1, row=0, sticky="news")
+                self.frequencies_widgets[freq] = {"entry_frame":entry_frame, "freq_frame":freq_frame}
+
+        # Position every entries :
+        for idx, freq in enumerate(sorted(self.frequencies)) :
+            self.frequencies_widgets[freq]["entry_frame"].grid(column=0, row=idx, sticky="news")
+
+        # Add button after the entries
+        if self.add_button is not None :
+            self.add_button.destroy()
+        self.add_button = ttk.Button(self.frame, text="Add", command=self.add_frequency)
         _, nb_row = self.frame.grid_size()
         self.add_button.grid(column=0, row=nb_row, sticky="news")
 
-        # Configure row and colums priorities
-        nb_col, nb_row = self.frame.grid_size()
-        for col in range(nb_col) :
-            self.frame.grid_columnconfigure(col, weight=1)
-        for row in range(nb_row) :
-            self.frame.grid_rowconfigure(row, weight=1)
-
-
     def get_frequencies_param(self) :
         freq_params = {}
-        for name, freqframe in self.frequencies.items() :
-            freq_params[name] = {}
+        for freq in self.frequencies :
+            freq_params[freq] = {}
+            freq_frame = self.frequencies_widgets[freq]["freq_frame"]
             for param in ["frequency", "amplitude", "phase", "angle"] :
-                freq_params[name][param] = freqframe.get(param)
+                freq_params[freq][param] = freq_frame.get(param)
         return freq_params
 
 
