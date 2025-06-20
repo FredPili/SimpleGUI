@@ -43,7 +43,7 @@ class EntryBundle(ttk.Frame) :
 
         self.grid_columnconfigure(0, weight=1, uniform=uniform)
         self.grid_columnconfigure(1, weight=1, uniform=uniform)
-        self.grid_rowconfigure(1, weight=1, uniform=uniform)
+        self.grid_rowconfigure(0, weight=1, uniform=uniform)
         self.grid_rowconfigure(1, weight=1, uniform=uniform)
        
         label = ttk.Label(self, text=name)
@@ -58,32 +58,32 @@ class EntryBundle(ttk.Frame) :
             self.value = IntVar(value=default_value)
 
         entry_frame = ttk.Frame(self)
-        entry_frame.grid(column=1, row=0, sticky="ew")
-        entry_frame.columnconfigure(0, weight=0)
+        entry_frame.grid(column=1, row=0, sticky="news")
+        entry_frame.columnconfigure(0, weight=1)
         entry = ttk.Entry(entry_frame, textvariable=self.value, width=width)
         entry.grid(column=0, row=0, sticky="ew")
 
         if add_scale :
             def scale_update(val) :
-                self.value.set(val)
-                if callback :
-                    callback()
+                if isinstance(self.value, IntVar) :
+                    self.value.set(int(round(float(val))))
+                else :
+                    self.value.set(val)
 
-            if type is None :
-                # Default to Double
-                num = DoubleVar()
-            elif type == "double" :
-                num = DoubleVar()
-            elif type == "int" :
-                num = IntVar()
-            scale = ttk.Scale(self, orient="horizontal", from_=from_, to=to, variable=num, command=scale_update)
+            scale = ttk.Scale(self, orient="horizontal", from_=from_, to=to, variable=self.value, command=scale_update)
             scale.grid(column=0, columnspan=2, row=1, sticky="ew")
+
+        def trace(*args) :
+            if callback :
+                callback()
+        self.value.trace_add("write", trace)
 
         for child in self.winfo_children():
             child.grid_configure(padx=2, pady=1)
 
     def get(self) : 
         return self.value.get()
+    
 
 class FrequencyFrame(ttk.Frame) :
     def __init__(
@@ -96,15 +96,15 @@ class FrequencyFrame(ttk.Frame) :
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_rowconfigure(2, weight=1)
 
         frame = ttk.Frame(self, border=1, relief="solid", padding=(5, 5, 5, 5))
         frame.grid(column=0, row=0, sticky="news")
+        frame.grid_columnconfigure((0, 1), weight=1)
+        frame.grid_rowconfigure((1, 2), weight=1)
 
         # Create a label (frequency name)
         freq_label = ttk.Label(frame, text=name)
-        freq_label.grid(column=0, row=0, sticky="nw")
+        freq_label.grid(column=0, columnspan=2, row=0, sticky="news")
 
         # Create entries
         # Uniform to align the entries
@@ -143,45 +143,55 @@ class FrequencyFrame(ttk.Frame) :
         return param_mapping[param].get()
 
 
-class ScrolledCanvas(Frame):
+class ScrolledFrame(Frame):
+    def __init__(self, root, vertical=True, horizontal=False) :
+        super().__init__(root)
 
-    def __init__(self, parent, vertical=True, horizontal=False):
-        super().__init__(parent)
+        self.canvas = Canvas(self)
+        self.canvas.grid(column=0, row=0, sticky="news")
+
+        if vertical :
+            self.vsbar = Scrollbar(self, orient=VERTICAL, command=self.canvas.yview)
+            self.vsbar.grid(column=1, row=0, sticky="ns")
+            self.canvas.configure(yscrollcommand=self.vsbar.set)
         
-        # create canvas
-        self._canvas = Canvas(self)
-        self._canvas.grid(row=0, column=0, sticky='nwes') # changed   
-
-        # create right scrollbar and connect to canvas Y
-        self._vertical_bar = Scrollbar(parent, orient='vertical', command=self._canvas.yview)
-        if vertical:
-            self._vertical_bar.grid(row=0, column=1, sticky='ns')
-        self._canvas.configure(yscrollcommand=self._vertical_bar.set)
-
-        # create bottom scrollbar and connect to canvas X
-        self._horizontal_bar = Scrollbar(self, orient='horizontal', command=self._canvas.xview)
-        if horizontal:
-            self._horizontal_bar.grid(row=1, column=0, sticky='we')
-        self._canvas.configure(xscrollcommand=self._horizontal_bar.set)
+        if horizontal :
+            self.hsbar = Scrollbar(self, orient=HORIZONTAL, command=self.canvas.xview)
+            self.hsbar.grid(column=0, row=1, sticky="ew")
+            self.canvas.configure(xscrollcommand=self.hsbar.set)
 
         self.inner = None
         
-        # autoresize inner frame
-        self.columnconfigure(0, weight=1) # changed
-        self.rowconfigure(0, weight=1) # changed
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+        self.rowconfigure(1, weight=0)
+        self.columnconfigure(1, weight=0)
+
+        self.bind("<Enter>", self._bound_to_mouswheel)
+        self.bind("<Leave>", self._unbound_to_mousewheel)
+
+        for child in self.winfo_children() :
+            child.grid_configure(padx=2)
+
+    def _bound_to_mouswheel(self, event) :
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _unbound_to_mousewheel(self, event) :
+        self.canvas.unbind_all("<MouseWheel>")
+
+    def _on_mousewheel(self, event) :
+        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+    def resize(self, event=None) :
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        self.canvas.itemconfig(self.window, width=self.canvas.winfo_width())
         
-
-    def resize(self, event=None): 
-        self._canvas.configure(scrollregion=self._canvas.bbox('all'))
-        self._canvas.itemconfig(self._window, width=self._canvas.winfo_width())
-
-
-    def add(self, widget):
+    def add(self, widget) :
         self.inner = widget
-        self._window = self._canvas.create_window((0, 0), window=self.inner, anchor='nw')
-        self.inner.bind('<Configure>', self.resize)
-        self._canvas.bind('<Configure>', self.resize)
-
+        self.window = self.canvas.create_window(0,0, window=self.inner, anchor="nw")
+        self.inner.bind("<Configure>", self.resize)
+        self.canvas.bind("<Configure>", self.resize)
+        
 
 class FrequencyEditor(ttk.Frame) :
     def __init__(
@@ -194,12 +204,12 @@ class FrequencyEditor(ttk.Frame) :
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-
-        scrolled_canvas = ScrolledCanvas(self, vertical=True, horizontal=False)
+        scrolled_canvas = ScrolledFrame(self, vertical=True, horizontal=False)
+        scrolled_canvas.grid(column=0, row=0, sticky="news")
 
         self.frame = ttk.Frame(scrolled_canvas)
         scrolled_canvas.add(self.frame)
-        scrolled_canvas.grid(column=0, row=0, sticky="news")
+        self.frame.grid_columnconfigure(0, weight=1)
 
         # Initialize widgets and button
         self.frequencies_widgets = {}
@@ -211,25 +221,16 @@ class FrequencyEditor(ttk.Frame) :
         # Build the editor
         self.build()
 
-        # Add y padding to every children of the editor frame
-        for child in self.frame.winfo_children() :
-            child.grid_configure(pady=8)
-        
-        # Configure row and colums priorities in the frame
-        nb_col, nb_row = self.frame.grid_size()
-        for col in range(nb_col) :
-            self.frame.grid_columnconfigure(col, weight=1)
-        for row in range(nb_row) :
-            self.frame.grid_rowconfigure(row, weight=1)
-
     def add_frequency(self) :
         new_freq = max(self.frequencies) + 1
         self.frequencies.append(new_freq)
         self.build()
+        self.callback()
 
     def delete_frequency(self, freq) :
         self.frequencies.remove(freq)
         self.build()
+        self.callback()
 
     def build(self) :
         # Clear the frame
@@ -247,6 +248,8 @@ class FrequencyEditor(ttk.Frame) :
         if len(to_add) > 0:
             for freq in to_add :
                 entry_frame = ttk.Frame(self.frame)
+                entry_frame.grid_columnconfigure(0, weight=0)
+                entry_frame.grid_columnconfigure(1, weight=1)
                 freq_frame = FrequencyFrame(root=entry_frame, name="Frequency " + str(freq), callback=self.callback)
                 freq_frame.grid(column=0, row=0, sticky="news")
                 del_button = ttk.Button(
@@ -258,14 +261,18 @@ class FrequencyEditor(ttk.Frame) :
 
         # Position every entries :
         for idx, freq in enumerate(sorted(self.frequencies)) :
-            self.frequencies_widgets[freq]["entry_frame"].grid(column=0, row=idx, sticky="news")
+            self.frequencies_widgets[freq]["entry_frame"].grid(column=0, row=idx, sticky="ew")
 
         # Add button after the entries
         if self.add_button is not None :
             self.add_button.destroy()
         self.add_button = ttk.Button(self.frame, text="Add", command=self.add_frequency)
         _, nb_row = self.frame.grid_size()
-        self.add_button.grid(column=0, row=nb_row, sticky="news")
+        self.add_button.grid(column=0, row=nb_row, sticky="ew")
+
+        # Add y padding to every children of the editor frame
+        for child in self.frame.winfo_children() :
+            child.grid_configure(pady=8)
 
     def get_frequencies_param(self) :
         freq_params = {}
