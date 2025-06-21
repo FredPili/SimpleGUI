@@ -1,9 +1,14 @@
 from tkinter import *
 from tkinter import ttk
+from tkinter import filedialog
 from PIL import Image, ImageTk
 import numpy as np
 import matplotlib.pyplot as plt
 from enum import IntEnum
+import os
+import json
+
+PARENT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class Events(IntEnum) :
     PARAM_CHANGE = 1
@@ -90,7 +95,8 @@ class FrequencyFrame(ttk.Frame) :
             self,
             root,
             name,
-            callback
+            callback,
+            params_dict=None
     ) :
         super().__init__(root)
 
@@ -109,13 +115,22 @@ class FrequencyFrame(ttk.Frame) :
         # Create entries
         # Uniform to align the entries
         uniform = "FreqGroup"
-
-        params = {
-            "frequency": ("Frequency (Hz)", 1.0, 0.1, 100.0),
-            "amplitude": ("Amplitude", 1.0, 0.1, 10),
-            "phase": ("Phase", 0.0, 0.0, 360.0),
-            "angle": ("Angle", 0.0, 0.0, 360.0),
-        }
+        
+        if params_dict :
+            params = {
+                "frequency": ("Frequency (Hz)", params_dict["frequency"], 0.1, 100.0),
+                "amplitude": ("Amplitude", params_dict["amplitude"], 0.1, 10),
+                "phase": ("Phase", params_dict["phase"], 0.0, 360.0),
+                "angle": ("Angle", params_dict["angle"], 0.0, 360.0),
+            }
+        else :
+            # Default params
+            params = {
+                "frequency": ("Frequency (Hz)", 1.0, 0.1, 100.0),
+                "amplitude": ("Amplitude", 1.0, 0.1, 10),
+                "phase": ("Phase", 0.0, 0.0, 360.0),
+                "angle": ("Angle", 0.0, 0.0, 360.0),
+            }
         positions = [(0,1), (1,1), (0,2), (1,2)]
         
         # Build the widgets
@@ -232,7 +247,10 @@ class FrequencyEditor(ttk.Frame) :
         self.build()
         self.callback()
 
-    def build(self) :
+    def build(self, freq_dict=None) : # If freq dict passed, will build according to this dict
+        if freq_dict :
+            self.frequencies = list(freq_dict.keys())
+
         # Clear the frame
         displayed_frequencies = self.frequencies_widgets.keys()
         to_remove = set(displayed_frequencies) - set(self.frequencies)
@@ -244,13 +262,20 @@ class FrequencyEditor(ttk.Frame) :
             del self.frequencies_widgets[freq]
 
         # Build every Frequency entries
-        to_add = set(self.frequencies) - set(displayed_frequencies)
+        if freq_dict :
+            # If freq dict passed, reload every entries
+            to_add = self.frequencies
+        else :
+            to_add = set(self.frequencies) - set(displayed_frequencies)
         if len(to_add) > 0:
             for freq in to_add :
                 entry_frame = ttk.Frame(self.frame)
                 entry_frame.grid_columnconfigure(0, weight=0)
                 entry_frame.grid_columnconfigure(1, weight=1)
-                freq_frame = FrequencyFrame(root=entry_frame, name="Frequency " + str(freq), callback=self.callback)
+                if freq_dict :
+                    freq_frame = FrequencyFrame(root=entry_frame, name="Frequency " + str(freq), callback=self.callback, params_dict=freq_dict[freq])
+                else :
+                    freq_frame = FrequencyFrame(root=entry_frame, name="Frequency " + str(freq), callback=self.callback)
                 freq_frame.grid(column=0, row=0, sticky="news")
                 del_button = ttk.Button(
                     entry_frame, 
@@ -282,6 +307,76 @@ class FrequencyEditor(ttk.Frame) :
             for param in ["frequency", "amplitude", "phase", "angle"] :
                 freq_params[freq][param] = freq_frame.get(param)
         return freq_params
+    
+    def load_frequencies(self, filename) :
+        with open(filename, "r") as file :
+            freq_dict = json.load(file)
+            file.close()
+        # Convert keys
+        freq_dict_convert = {int(k):v for k, v in freq_dict.items()}
+        self.build(freq_dict_convert)
+        self.callback()
+
+    def save_frequencies(self, filename) :
+        freq_params = self.get_frequencies_param()
+        # Convert keys
+        freq_params_convert = {str(k):v for k, v in freq_params.items()}
+        with open(filename, "w") as file :
+            json.dump(freq_params_convert, file)
+            file.close()
+        
+
+class SaveManager(ttk.Frame) :
+    def __init__(self, root, initialdir, load_command=None, savecommand=None) :
+        super().__init__(root)
+
+        self.initialdir = initialdir
+        self.load_command = load_command
+        self.save_command = savecommand
+
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        # Mainframe container
+        frame = ttk.Frame(self)
+        frame.grid(column=0, row=0, sticky="news")
+        
+        # Load button
+        load_button = ttk.Button(frame, text="Load", command=self.load)
+        load_button.grid(column=0, row=0, sticky="ew")
+        load_button.grid_configure(padx=2)
+        
+        # Save button
+        save_button = ttk.Button(frame, text="Save", command=self.save)
+        save_button.grid(column=1, row=0, sticky="ew")
+        save_button.grid_configure(padx=2)
+
+        # Mainframe grid configure
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_columnconfigure(1, weight=1)
+        frame.grid_rowconfigure(0, weight=1)
+
+    def load(self) :
+        filename = filedialog.askopenfilename(
+            initialdir=self.initialdir,
+            filetypes=[("JSON files", "*.json")],
+        )
+        if filename and self.load_command :
+            self.load_command(filename)
+
+    def save(self) :
+        filename = filedialog.asksaveasfilename(
+            initialdir=self.initialdir,
+            filetypes=[("JSON files", "*.json")],
+        )
+        if filename and self.save_command :
+            self.save_command(filename)
+
+    def set_load_command(self, load_command) :
+        self.load_command = load_command
+
+    def set_save_command(self, save_command) :
+        self.save_command = save_command
 
 
 class WaveViewer :
@@ -340,6 +435,10 @@ class WaveViewer :
 
         for child in param_frame.winfo_children() :
             child.grid_configure(padx=2, pady=2)
+
+        #----------------SaveManager------------------------
+        self.save_manager = SaveManager(top_frame, initialdir=PARENT_DIR)
+        self.save_manager.grid(column=1, row=0, sticky="news")
         
         #-----------------Bottom Frame-----------------------
         bottom_frame = ttk.Frame(mainframe)
@@ -348,6 +447,9 @@ class WaveViewer :
         #----------------Frequency Editor---------------------
         self.freq_editor = FrequencyEditor(bottom_frame, callback=lambda: self.event_bus.publish(Events.PARAM_CHANGE))
         self.freq_editor.grid(column=0, row=0, sticky="nesw")
+        # Set the load command in the save manager
+        self.save_manager.set_load_command(self.freq_editor.load_frequencies)
+        self.save_manager.set_save_command(self.freq_editor.save_frequencies)
 
         #--------------Visualiazation Frame--------------------
         visu_frame = ttk.Frame(bottom_frame)

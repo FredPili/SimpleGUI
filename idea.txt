@@ -9,9 +9,14 @@ The image must stay the same size in the GUI no matter the number of sample poin
 
 Future ideas : 
     - Add the possiblity to display 1D sinwaves 
-    - Add a fourier transform visualization DONE
-    - Possibility to add mutliple frequencies DONE
-    - Seperate logic from UI
+    - Add a fourier transform visualization            DONE
+    - Possibility to add mutliple frequencies          DONE
+    - Seperate logic from UI                           DONE
     - Implement an evet bus to avoid having to recompute the 
-    image for each callacks if not needed.
-    - Implement frequency deletion
+    image for each callacks if not needed.             DONE
+    - Implement frequency deletion                     DONE
+    - Implement scrollbar                              DONE
+    - Implement a load/save function to load
+    or save a set of frequencies                       DONE
+    - Implement a player that plays a scripted sequnce
+    of paramter change. e.g. changing phase and frquency over time.
