@@ -4,6 +4,7 @@ from enum import IntEnum
 class Events(IntEnum) :
     PARAM_CHANGE = 1
     DISPLAY_CHANGE = 2
+    PLAYER_STEP = 3
 
 
 class EventBus :

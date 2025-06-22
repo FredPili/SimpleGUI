@@ -63,6 +63,9 @@ class EntryBundle(ttk.Frame) :
     def get(self) : 
         return self.value.get()
     
+    def set(self, val) :
+        self.value.set(val)
+    
 
 if __name__ == "__main__" :
     root = Tk()

@@ -59,6 +59,8 @@ class SequencePlayer :
         self.running = False
         self.paused = False
 
+        self.time = time.time()
+
     def start(self):
         if self.thread is None or not self.thread.is_alive() :
             self.running = True
@@ -78,13 +80,15 @@ class SequencePlayer :
 
     def run(self) :
         for step in self.sequence :
+            self.time = time.time()
             if not self.running :
                 break
             while self.paused :
                 time.sleep(0.05)
             if self.callback:
                 self.callback(step)
-            time.sleep(self.timestep)
+            to_sleep = max(0, self.timestep - (time.time() - self.time))
+            time.sleep(to_sleep)
 
     def set_sequence(self, sequence) :
         self.sequence = sequence
@@ -117,10 +121,10 @@ if __name__ == "__main__" :
         }
         player = make_sequence_player(sequence_config, callback=on_step)
 
-        Button(root, text="Start", command=player.start).grid(column=0, row=0, sticky="news")
-        Button(root, text="Pause", command=player.pause).grid(column=1, row=0, sticky="news")
-        Button(root, text="Resume", command=player.resume).grid(column=2, row=0, sticky="news")
-        Button(root, text="Stop", command=player.stop).grid(column=3, row=0, sticky="news")
+        ttk.Button(root, text="Start", command=player.start).grid(column=0, row=0, sticky="news")
+        ttk.Button(root, text="Pause", command=player.pause).grid(column=1, row=0, sticky="news")
+        ttk.Button(root, text="Resume", command=player.resume).grid(column=2, row=0, sticky="news")
+        ttk.Button(root, text="Stop", command=player.stop).grid(column=3, row=0, sticky="news")
 
         label = ttk.Label(root, text="Step: -")
         label.grid(column=0, row=1, rowspan=4, sticky="news")

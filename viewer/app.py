@@ -4,6 +4,7 @@ from core.events import EventBus, Events
 from widgets.entry_bundle import EntryBundle
 from widgets.frequency_editor import FrequencyEditor
 from widgets.save_manager import SaveManager
+from widgets.sequence_manager import SequenceManager
 from core.generation import generate_wave, apply_fourier_transform
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,8 +18,10 @@ class WaveViewer(ttk.Frame) :
         self.event_bus = EventBus()
         self.event_bus.subscribe(Events.PARAM_CHANGE, self.on_param_change)
         self.event_bus.subscribe(Events.DISPLAY_CHANGE, self.on_display_change)
+        self.event_bus.subscribe(Events.PLAYER_STEP, self.on_step)
 
-        mainframe = ttk.Frame(root)
+        self.root = root
+        mainframe = ttk.Frame(self.root)
         mainframe.grid(column=0, row=0, sticky=(N, W, E, S))
 
         # ----------TOP Frame----------------------------
@@ -68,6 +71,14 @@ class WaveViewer(ttk.Frame) :
         #----------------SaveManager------------------------
         self.save_manager = SaveManager(top_frame, initialdir=initialdir)
         self.save_manager.grid(column=1, row=0, sticky="news")
+
+        #---------------Sequence Manager--------------------
+        self.sequence_manager = SequenceManager(top_frame, initialdir=initialdir, callback=self.on_step)
+        self.sequence_manager.grid(column=2, row=0, sticky="news")
+
+        #-------------TopFrame grid configure-----------------
+        for child in top_frame.winfo_children() :
+            child.grid_configure(padx=20)
         
         #-----------------Bottom Frame-----------------------
         bottom_frame = ttk.Frame(mainframe)
@@ -165,6 +176,11 @@ class WaveViewer(ttk.Frame) :
 
     def on_display_change(self) :
         self.display_image()
+
+    def on_step(self, step) :
+        step["phase"] = step["phase"] % 360
+        step["angle"] = step["angle"] % 360
+        self.root.after_idle(lambda: self.freq_editor.frequencies_widgets[1]["freq_frame"].set(step))
 
 if __name__ == "__main__" :
     import os

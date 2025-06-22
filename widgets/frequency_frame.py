@@ -70,6 +70,17 @@ class FrequencyFrame(ttk.Frame) :
         }
         return param_mapping[param].get()
     
+    def set(self, param_dict) :
+        param_mapping = {
+            "frequency" : self.frequency_bundle,
+            "amplitude" : self.amplitude_bundle,
+            "phase" : self.phase_bundle,
+            "angle" : self.angle_bundle,
+        }
+        for param, value in param_dict.items() :
+            if param in param_mapping.keys() :
+                param_mapping[param].set(value)
+    
 
 if __name__ == "__main__" :
     root = Tk()

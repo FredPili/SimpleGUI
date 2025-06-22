@@ -26,13 +26,13 @@ class SequenceManager(ttk.Frame) :
 
         # SequencePlayer
         self.player = SequencePlayer(sequence=sequence, callback=callback)
-        Button(mainframe, text="Start", command=self.player.start).grid(column=1, row=0, sticky="news")
-        Button(mainframe, text="Pause", command=self.player.pause).grid(column=2, row=0, sticky="news")
-        Button(mainframe, text="Resume", command=self.player.resume).grid(column=3, row=0, sticky="news")
-        Button(mainframe, text="Stop", command=self.player.stop).grid(column=4, row=0, sticky="news")
+        ttk.Button(mainframe, text="Start", command=self.player.start).grid(column=1, row=0, sticky="news")
+        ttk.Button(mainframe, text="Pause", command=self.player.pause).grid(column=2, row=0, sticky="news")
+        ttk.Button(mainframe, text="Resume", command=self.player.resume).grid(column=3, row=0, sticky="news")
+        ttk.Button(mainframe, text="Stop", command=self.player.stop).grid(column=4, row=0, sticky="news")
 
         # Label to display informations
-        self.label = ttk.Label(mainframe, text="SequenceManager infos")
+        self.label = ttk.Label(mainframe, text="Sequence Manager infos")
         self.label.grid(column=0, columnspan=4, row=1, sticky="news")
 
         # Padding
@@ -60,7 +60,6 @@ if __name__ == "__main__" :
 
     def on_step(step) :
         print("Step:", step)
-        nb_steps = len(sequence_manager.player.sequence)
 
     import os
     sequence_manager = SequenceManager(
