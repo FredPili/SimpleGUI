@@ -79,6 +79,8 @@ class FrequencyFrame(ttk.Frame) :
         }
         for param, value in param_dict.items() :
             if param in param_mapping.keys() :
+                if param in ["angle", "phase"] :
+                    value = value % 360.0
                 param_mapping[param].set(value)
     
 

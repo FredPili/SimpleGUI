@@ -105,6 +105,11 @@ class FrequencyEditor(ttk.Frame) :
                 freq_params[freq][param] = freq_frame.get(param)
         return freq_params
     
+    def set_frequency_param(self, params) :
+        for freq_label, param_dict in params.items() :
+            self.frequencies_widgets[freq_label]["freq_frame"].set(param_dict)
+
+
     def load_frequencies(self, filename) :
         freq_dict = load_frequencies_dict(filename)
         self.build(freq_dict)

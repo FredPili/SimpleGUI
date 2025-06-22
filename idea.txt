@@ -19,4 +19,7 @@ Future ideas :
     - Implement a load/save function to load
     or save a set of frequencies                       DONE
     - Implement a player that plays a scripted sequnce
-    of paramter change. e.g. changing phase and frquency over time.
+    of paramter change. e.g. changing phase and frquency over time.   DONE
+    - Add package support for the EventBus
+    - Make sequences for different frequencies         DONE
+    - Implement dataclasses for waves and sequences

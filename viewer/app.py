@@ -34,7 +34,7 @@ class WaveViewer(ttk.Frame) :
         self.sample_bundle = EntryBundle(
             param_frame, 
             name="Nb samples", 
-            default_value=500,
+            default_value=150,
             type="int",            
             add_scale=True, 
             from_=2,
@@ -43,7 +43,7 @@ class WaveViewer(ttk.Frame) :
             uniform="params"
             )
         self.sample_bundle.grid(column=0, row=0, sticky="nsew")
-
+        
 
         self.length_bundle = EntryBundle(
             param_frame, 
@@ -95,7 +95,6 @@ class WaveViewer(ttk.Frame) :
         visu_frame = ttk.Frame(bottom_frame)
         visu_frame.grid(column=1, row=0, sticky=(E, W))
 
-        # PLaceholder self.image to confirm the widhets positions
         self.width, self.height = 500, 500
         self.canvas = Canvas(visu_frame, width=self.width, height=self.height)
         self.canvas.grid(column=0, row=0, rowspan=2, sticky=(N, W, E, S))
@@ -139,7 +138,7 @@ class WaveViewer(ttk.Frame) :
         self.display_image()
 
     def generate_image(self, *args) :
-        # Get general parameters 
+        # Get general parameters
         nb_samples = self.sample_bundle.get()
         length = self.length_bundle.get()
         # Get frequencies parameters
@@ -178,9 +177,7 @@ class WaveViewer(ttk.Frame) :
         self.display_image()
 
     def on_step(self, step) :
-        step["phase"] = step["phase"] % 360
-        step["angle"] = step["angle"] % 360
-        self.root.after_idle(lambda: self.freq_editor.frequencies_widgets[1]["freq_frame"].set(step))
+        self.root.after_idle(lambda: self.freq_editor.set_frequency_param(step))
 
 if __name__ == "__main__" :
     import os
